@@ -103,6 +103,7 @@ def try_code(i):
 with ThreadPoolExecutor(max_workers=WORKERS) as ex:
     futures = [ex.submit(try_code, i) for i in range(10000)]
     # 创建一个含10000个Future对象的列表，每个 Future 代表一个在线程/进程池中运行的异步任务
+    # 但同时执行的任务数最大为max_workers，剩余10000-max_workers个任务排队等待
     while not found.is_set() and any(not f.done() for f in futures):
 #当任务完成时f.done()返回True，未完成返回False
 #any():当括号内重复执行的表达式有一个返回True，any()返回True，否则False
